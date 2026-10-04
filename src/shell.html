@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -58,6 +58,8 @@
     font-size: 16px; line-height: 1.5; -webkit-tap-highlight-color: transparent;
     touch-action: manipulation; -webkit-text-size-adjust: 100%;
   }
+  *, *::before, *::after { touch-action: manipulation; }
+  input, select, textarea { font-size: max(16px, 1em); }
   .kb, .kb * , .btn, .seg button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   button, input, select { font: inherit; color: inherit; }
   button { cursor: pointer; }
@@ -409,7 +411,9 @@
 <!--SCRIPTS-->
 <script>
   if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) {
-    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then((reg) => reg.update()).catch(() => {});
+    });
   }
 </script>
 </body>

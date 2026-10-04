@@ -4,7 +4,7 @@
  *   ・フォントとライブラリ（外部）：取れたらキャッシュし、取れなければキャッシュを使う
  *  CACHE_VERSION は build.py がビルドのたびに書き換える。
  * ===================================================================== */
-const CACHE_VERSION = "71eee4ff79";
+const CACHE_VERSION = "257ecd4649";
 const CACHE_NAME = `fumendai-piano-${CACHE_VERSION}`;
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
@@ -24,6 +24,8 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const sameOrigin = new URL(req.url).origin === self.location.origin;
+  // 画面本体（index.html）はネットにつながっていれば常に最新を使う。オフラインのときだけキャッシュ
+  if (req.mode === "navigate") { event.respondWith(networkFirst(req, "./index.html")); return; }
   event.respondWith(sameOrigin ? staleWhileRevalidate(req) : networkFirst(req));
 });
 
@@ -34,13 +36,13 @@ async function staleWhileRevalidate(req) {
   return cached || (await fresh) || (await cache.match("./index.html")) || Response.error();
 }
 
-async function networkFirst(req) {
+async function networkFirst(req, fallbackUrl = null) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const res = await fetch(req);
     if (res.ok || res.type === "opaque") cache.put(req, res.clone());
     return res;
   } catch {
-    return (await cache.match(req)) || Response.error();
+    return (await cache.match(req, { ignoreSearch: true })) || (fallbackUrl && (await cache.match(fallbackUrl))) || Response.error();
   }
 }

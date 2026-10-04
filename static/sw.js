@@ -24,6 +24,8 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const sameOrigin = new URL(req.url).origin === self.location.origin;
+  // 画面本体（index.html）はネットにつながっていれば常に最新を使う。オフラインのときだけキャッシュ
+  if (req.mode === "navigate") { event.respondWith(networkFirst(req, "./index.html")); return; }
   event.respondWith(sameOrigin ? staleWhileRevalidate(req) : networkFirst(req));
 });
 
@@ -34,13 +36,13 @@ async function staleWhileRevalidate(req) {
   return cached || (await fresh) || (await cache.match("./index.html")) || Response.error();
 }
 
-async function networkFirst(req) {
+async function networkFirst(req, fallbackUrl = null) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const res = await fetch(req);
     if (res.ok || res.type === "opaque") cache.put(req, res.clone());
     return res;
   } catch {
-    return (await cache.match(req)) || Response.error();
+    return (await cache.match(req, { ignoreSearch: true })) || (fallbackUrl && (await cache.match(fallbackUrl))) || Response.error();
   }
 }

@@ -14,7 +14,7 @@ ROOT = Path(__file__).parent
 SRC, STATIC, OUT = ROOT / "src", ROOT / "static", ROOT / "docs"
 
 # 読み込み順（後ろのモジュールは前のモジュールを使う）
-MODULES = ["theory", "score", "library", "importers", "audio", "input",
+MODULES = ["zoomguard", "theory", "score", "library", "importers", "audio", "input",
            "keyboard", "notation", "practice", "log", "app"]
 
 
