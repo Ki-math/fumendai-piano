@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="譜面台ピアノ">
+<meta name="theme-color" content="#1B1E28">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<title>譜面台ピアノ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Music&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" defer></script>
+<style>
+  :root {
+    --bg: #ECEEF2;
+    --surface: #FFFFFF;
+    --paper: #FFFFFF;
+    --ink: #1B1E28;
+    --muted: #646A7D;
+    --line: #D6DAE3;
+    --accent: #F2B705;
+    --accent-ink: #2A2100;
+    --hand-r: #2F6BD8;
+    --hand-l: #E07A2C;
+    --ok: #1E9E63;
+    --ng: #D6423A;
+    --staff: #2A2E3C;
+    --white-key: #FBFBF8;
+    --black-key: #1B1C22;
+    --key-edge: #B9BCC8;
+    --do: #E5484D; --re: #F08C2B; --mi: #C9A20A; --fa: #3DAA5C; --so: #2FA7D8; --ra: #3B63D6; --si: #9B55C9;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11131B; --surface: #1B1E2A; --paper: #1D2030; --ink: #E9EBF3; --muted: #9AA0B6; --line: #2D3144;
+      --staff: #C3C8D8; --hand-r: #6E9DF2; --hand-l: #F29B55; --key-edge: #555A70;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11131B; --surface: #1B1E2A; --paper: #1D2030; --ink: #E9EBF3; --muted: #9AA0B6; --line: #2D3144;
+    --staff: #C3C8D8; --hand-r: #6E9DF2; --hand-l: #F29B55; --key-edge: #555A70;
+    color-scheme: dark;
+  }
+
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "BIZ UDPGothic", "Yu Gothic", system-ui, sans-serif;
+    font-size: 16px; line-height: 1.5; -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; -webkit-text-size-adjust: 100%;
+  }
+  .kb, .kb * , .btn, .seg button { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  input[type="range"] { accent-color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  .app {
+    height: 100%; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; max-width: 1400px; margin: 0 auto;
+    padding-top: max(12px, env(safe-area-inset-top, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* ---------- 共通の部品 ---------- */
+  .seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 999px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .seg button:disabled { opacity: .35; cursor: not-allowed; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .btn.accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+  .btn[aria-pressed="true"]::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  .spacer { flex: 1; }
+  .muted { color: var(--muted); }
+  .stars { color: var(--accent); letter-spacing: 2px; font-size: 15px; }
+  .stars .off { color: var(--line); }
+
+  /* ---------- ヘッダー ---------- */
+  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+  .brand { font-weight: 900; font-size: 21px; display: flex; align-items: center; gap: 8px; letter-spacing: .02em; }
+  .brand svg { width: 26px; height: 26px; }
+  .status-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 14px; font-weight: 700; font-size: 14px; }
+  .status-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .status-chip[data-src="midi"] .dot, .status-chip[data-src="mic"] .dot { background: var(--ok); }
+
+  /* ---------- 一覧画面 ---------- */
+  .view { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; padding-bottom: 24px; }
+  .view-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+  .view-head h1 { font-size: 26px; font-weight: 900; }
+  .view-head p { margin: 2px 0 0; color: var(--muted); font-size: 14px; max-width: 60ch; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+  .card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; }
+  .card-open { border: 0; background: transparent; text-align: left; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border-radius: 14px; flex: 1; }
+  .card-open:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .card .title { font-size: 17px; font-weight: 900; line-height: 1.35; }
+  .card .who { color: var(--muted); font-size: 13px; }
+  .card .meta { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; margin-top: auto; }
+  .card.imp .meta { padding-right: 64px; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .badge { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); letter-spacing: .04em; }
+  .badge.imp { background: color-mix(in srgb, var(--hand-r) 14%, transparent); color: var(--hand-r); }
+  .card-del { position: absolute; right: 10px; bottom: 10px; border: 0; background: transparent; color: var(--muted); font-size: 13px; padding: 4px 8px; border-radius: 6px; }
+  .card-del.confirm { background: var(--ng); color: #fff; }
+  .note-box { background: var(--surface); border: 1px dashed var(--line); border-radius: 12px; padding: 12px 16px; font-size: 14px; color: var(--muted); line-height: 1.7; }
+  .note-box b { color: var(--ink); }
+
+  .lesson-list { display: flex; flex-direction: column; gap: 8px; }
+  .lesson { display: grid; grid-template-columns: 44px 1fr auto; gap: 14px; align-items: center; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+  .lesson .num { font-weight: 900; font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: center; }
+  .lesson .lt { display: block; font-size: 16px; font-weight: 900; }
+  .lesson .ld { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+  .lesson.next { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .lesson .next-tag { font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 6px; padding: 1px 8px; margin-left: 6px; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+  .tile .label { font-size: 12px; color: var(--muted); letter-spacing: .08em; }
+  .tile .value { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .tile .value small { font-size: 14px; font-weight: 700; color: var(--muted); margin-left: 2px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .panel h2 { font-size: 16px; font-weight: 900; margin-bottom: 8px; }
+  .chart-wrap { overflow-x: auto; }
+  .chart .bar-rect { fill: var(--hand-r); }
+  .chart .bar-rect.today { fill: var(--accent); }
+  .chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .chart .grid { stroke: var(--line); }
+  .table-wrap { overflow-x: auto; }
+  table.log { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  table.log th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  table.log td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+
+  /* ---------- 練習画面 ---------- */
+  .practice { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+  .ptool { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .ptitle { display: flex; flex-direction: column; min-width: 0; margin-right: auto; }
+  .ptitle b { font-size: 18px; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 42vw; }
+  .ptitle small { color: var(--muted); font-size: 13px; }
+  .ptool2 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .tempo { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 5px 12px; font-weight: 700; font-size: 14px; }
+  .tempo input { width: 150px; accent-color: var(--ink); }
+  .tempo output { font-variant-numeric: tabular-nums; min-width: 92px; }
+  .pstatus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 26px; }
+  .pstatus b { color: var(--ink); }
+  .pstatus .msg { font-weight: 700; font-size: 16px; color: var(--ink); }
+  .pstatus .msg.ok { color: var(--ok); }
+  .pstatus .msg.ng { color: var(--ng); }
+  .progress { flex: 0 0 120px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s; }
+  .legend { display: inline-flex; gap: 12px; font-size: 13px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .legend .r::before { background: var(--hand-r); }
+  .legend .l::before { background: var(--hand-l); }
+
+  .score-scroll { flex: 1; min-height: 180px; overflow-y: auto; overflow-x: hidden; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; scroll-behavior: smooth; }
+  #scoreSvg { display: block; width: 100%; }
+  #scoreSvg .staff-line, #scoreSvg .ledger { stroke: var(--staff); stroke-width: 1; }
+  #scoreSvg .bar { stroke: var(--staff); stroke-width: 1.3; }
+  #scoreSvg .bar-thick, #scoreSvg .rest-block { fill: var(--staff); }
+  #scoreSvg .brace { stroke: var(--staff); stroke-width: 2.4; fill: none; }
+  #scoreSvg .clef, #scoreSvg .rest { fill: var(--staff); font-family: "Noto Music", serif; }
+  #scoreSvg .timesig { fill: var(--staff); font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+  #scoreSvg .acc { fill: var(--ink); font-family: "Noto Music", "Segoe UI Symbol", serif; }
+  #scoreSvg .mnum { fill: var(--muted); font-style: italic; }
+  #scoreSvg .stem { stroke: var(--ink); stroke-width: 1.3; }
+  #scoreSvg .flag { stroke: var(--ink); stroke-width: 1.8; fill: none; }
+  #scoreSvg .tie { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+  #scoreSvg .note.ok .tie { stroke: var(--ok); }
+  #scoreSvg .dot { fill: var(--ink); }
+  #scoreSvg .finger { fill: var(--muted); font-weight: 700; }
+  #scoreSvg .nm { fill: var(--muted); font-weight: 700; }
+  #scoreSvg .note .head { fill: var(--ink); }
+  #scoreSvg .note .head.hollow { fill: var(--paper); stroke: var(--ink); stroke-width: 1.7; }
+  #scoreSvg.colorize .note .head { fill: var(--nc); }
+  #scoreSvg.colorize .note .head.hollow { fill: var(--paper); stroke: var(--nc); }
+  #scoreSvg .note.cur.hR .head { fill: var(--hand-r); }
+  #scoreSvg .note.cur.hL .head { fill: var(--hand-l); }
+  #scoreSvg .note.cur.hR .head.hollow { fill: var(--paper); stroke: var(--hand-r); stroke-width: 2.6; }
+  #scoreSvg .note.cur.hL .head.hollow { fill: var(--paper); stroke: var(--hand-l); stroke-width: 2.6; }
+  #scoreSvg .note.ok .head { fill: var(--ok); }
+  #scoreSvg .note.ok .head.hollow { fill: var(--paper); stroke: var(--ok); }
+  #scoreSvg .note.miss .head { fill: var(--ng); }
+  #scoreSvg .note.miss .head.hollow { fill: var(--paper); stroke: var(--ng); }
+  #scoreSvg.dim-R .note.hR, #scoreSvg.dim-L .note.hL { opacity: .35; }
+  #scoreSvg .mhit { fill: transparent; cursor: pointer; }
+  #scoreSvg .loop-range { fill: var(--accent); opacity: .13; }
+  #scoreSvg .loop-pending { fill: var(--accent); opacity: .3; }
+  #scoreSvg .sv-cursor { fill: var(--accent); opacity: .32; pointer-events: none; }
+  .picking #scoreSvg .mhit:hover { fill: var(--accent); opacity: .18; }
+
+  /* ---------- 鍵盤 ---------- */
+  .kb-wrap { overflow-x: auto; border-radius: 10px; -webkit-overflow-scrolling: touch; flex: none; }
+  .kb { position: relative; height: clamp(110px, 20vh, 190px); display: flex; min-width: 100%; user-select: none; touch-action: none; }
+  .key-w { flex: 1 0 26px; position: relative; background: var(--white-key); border: 1px solid var(--key-edge); border-left-width: 0; border-radius: 0 0 6px 6px; display: flex; justify-content: center; align-items: flex-end; padding-bottom: 6px; box-sizing: border-box; }
+  .key-w:first-child { border-left-width: 1px; }
+  .key-b { position: absolute; top: 0; height: 60%; background: var(--black-key); border-radius: 0 0 5px 5px; z-index: 2; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+  .key-label { font-size: 11px; font-weight: 700; color: #6B7088; pointer-events: none; }
+  .key-w.middle-c .key-label { color: #1B1E28; }
+  .key-w.t-R { background: color-mix(in srgb, var(--hand-r) 42%, var(--white-key)); }
+  .key-w.t-L { background: color-mix(in srgb, var(--hand-l) 45%, var(--white-key)); }
+  .key-b.t-R { background: color-mix(in srgb, var(--hand-r) 75%, #000); }
+  .key-b.t-L { background: color-mix(in srgb, var(--hand-l) 75%, #000); }
+  .key-w.pressed { box-shadow: inset 0 -10px 0 color-mix(in srgb, var(--ink) 35%, transparent); }
+  .key-b.pressed { box-shadow: inset 0 -8px 0 rgba(255,255,255,.35); }
+  .key-w.hit-ng, .key-b.hit-ng { background: var(--ng) !important; }
+
+  /* ---------- 設定・結果・通知 ---------- */
+  .sheet { position: fixed; inset: 0; background: rgba(10,12,20,.5); display: grid; place-items: center; padding: 16px; z-index: 20; }
+  .sheet-card { background: var(--surface); border-radius: 18px; padding: 20px 22px; width: min(560px, 100%); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; }
+  .sheet-card h2 { font-size: 20px; font-weight: 900; }
+  .sheet-card h3 { font-size: 13px; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .field { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+  .field > span:first-child { min-width: 7em; font-weight: 700; font-size: 14px; }
+  .hint-text { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 0; }
+  .result-card { text-align: center; align-items: center; }
+  .big-pct { font-size: 56px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .big-pct small { font-size: 22px; }
+  .result-card .stars { font-size: 40px; letter-spacing: 6px; }
+  .result-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 22px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .result-stats b { display: block; font-size: 20px; color: var(--ink); }
+  .result-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 10px 18px; border-radius: 12px; font-weight: 700; z-index: 30; max-width: calc(100% - 32px); box-sizing: border-box; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+
+  .mic-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--accent); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+  .mic-banner span { flex: 1; min-width: 14em; }
+  .mic-banner .x { border: 0; background: transparent; color: var(--muted); font-size: 18px; padding: 4px 8px; }
+
+  /* ---------- 大きく表示 ---------- */
+  body.focus .app { max-width: none; gap: 8px; }
+  body.focus .kb { height: clamp(150px, 28vh, 300px); }
+
+  /* ---------- タブレット ---------- */
+  @media (min-width: 700px) and (pointer: coarse) {
+    body { font-size: 17px; }
+    .seg button { padding: 10px 17px; }
+    .btn { padding: 10px 16px; }
+    .kb { height: clamp(140px, 24vh, 240px); }
+    .key-w { flex-basis: 30px; }
+    .tempo input { width: 190px; }
+  }
+  @media (max-width: 640px) {
+    .ptitle b { max-width: 70vw; }
+    .tempo input { width: 110px; }
+    .big-pct { font-size: 44px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .score-scroll { scroll-behavior: auto; }
+    .progress i { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="bar" id="topBar">
+    <div class="brand">
+      <svg viewBox="0 0 26 26" aria-hidden="true"><rect x="1" y="4" width="24" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 4v11M13 4v18M18 4v11" stroke="currentColor" stroke-width="2"/><rect x="6.5" y="4" width="3" height="9" fill="currentColor"/><rect x="16.5" y="4" width="3" height="9" fill="currentColor"/></svg>
+      譜面台ピアノ
+    </div>
+    <div class="seg" role="tablist" aria-label="画面">
+      <button type="button" data-view="library" aria-pressed="true">曲</button>
+      <button type="button" data-view="lessons" aria-pressed="false">レッスン</button>
+      <button type="button" data-view="log" aria-pressed="false">記録</button>
+    </div>
+    <span class="spacer"></span>
+    <button type="button" class="status-chip" id="inputChip" data-src="tap"><span class="dot"></span><span id="inputText">画面の鍵盤</span></button>
+    <button type="button" class="btn" id="settingsBtn">設定</button>
+  </header>
+
+  <!-- 曲 -->
+  <section class="view" id="view-library">
+    <div class="view-head">
+      <div>
+        <h1>曲</h1>
+        <p>両手の大譜表で練習できます。手持ちの楽譜データ（MusicXML・MIDI）も読み込めます。</p>
+      </div>
+      <span class="spacer"></span>
+      <label class="btn accent" for="fileInput">＋ 曲を読み込む</label>
+      <input type="file" id="fileInput" accept=".mid,.midi,.xml,.musicxml,.mxl" hidden>
+    </div>
+    <div class="card-grid" id="pieceGrid"></div>
+    <div class="note-box">
+      <b>楽譜データの入手先</b>　著作権の切れたクラシック曲は IMSLP や MuseScore の公開楽譜から MusicXML・MIDI で入手できます。楽譜ソフトで作った譜面も「MusicXMLで書き出し」で読み込めます。ピアノ譜（2段）はト音記号を右手、ヘ音記号を左手として扱います。
+    </div>
+  </section>
+
+  <!-- レッスン -->
+  <section class="view" id="view-lessons" hidden>
+    <div class="view-head">
+      <div>
+        <h1>レッスン</h1>
+        <p>5本の指の位置からスケール・和音・読譜まで、順番に進めるコースです。テンポモードで100%・正確さ95%以上を取ると★3つになります。</p>
+      </div>
+    </div>
+    <div class="lesson-list" id="lessonList"></div>
+  </section>
+
+  <!-- 記録 -->
+  <section class="view" id="view-log" hidden>
+    <div class="view-head"><div><h1>練習記録</h1><p>鍵盤を弾いている時間だけを練習時間として数えます（30秒以上手が止まると数えません）。</p></div></div>
+    <div class="tiles" id="logTiles"></div>
+    <div class="panel"><h2>最近14日の練習時間（分）</h2><div class="chart-wrap" id="logChart"></div></div>
+    <div class="panel"><h2>最近の練習</h2><div class="table-wrap" id="logTable"></div></div>
+  </section>
+
+  <!-- 練習 -->
+  <section class="practice" id="view-practice" hidden>
+    <div class="ptool">
+      <button type="button" class="btn" id="backBtn">‹ 一覧</button>
+      <div class="ptitle"><b id="pTitle"></b><small id="pSub"></small></div>
+      <div class="seg" id="handSeg" role="group" aria-label="練習する手">
+        <button type="button" data-hands="R">右手</button>
+        <button type="button" data-hands="L">左手</button>
+        <button type="button" data-hands="both">両手</button>
+      </div>
+      <div class="seg" id="modeSeg" role="group" aria-label="練習モード">
+        <button type="button" data-mode="wait">ウェイト</button>
+        <button type="button" data-mode="tempo">テンポ</button>
+      </div>
+      <button type="button" class="btn" id="listenBtn">▶ お手本</button>
+      <button type="button" class="btn primary" id="startBtn">スタート</button>
+    </div>
+    <div class="ptool2">
+      <label class="tempo" for="tempo">テンポ <input type="range" id="tempo" min="30" max="150" step="5" value="100"> <output id="tempoOut" for="tempo"></output></label>
+      <button type="button" class="btn" id="metroBtn" aria-pressed="true">メトロノーム</button>
+      <button type="button" class="btn" id="accompBtn" aria-pressed="true" title="練習しない手をアプリが弾きます">伴奏</button>
+      <button type="button" class="btn" id="loopBtn" aria-pressed="false">A–B リピート</button>
+      <button type="button" class="btn" id="speedBtn" aria-pressed="false">だんだん速く</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="zoomOut" aria-label="楽譜を小さく">A−</button>
+      <button type="button" class="btn" id="zoomIn" aria-label="楽譜を大きく">A＋</button>
+      <button type="button" class="btn" id="bigBtn">⛶ 大きく</button>
+    </div>
+    <div class="pstatus" id="pStatus">
+      <span id="stMeasure"></span>
+      <span class="progress" aria-hidden="true"><i id="stProgress"></i></span>
+      <span id="stAccuracy"></span>
+      <span id="stPass"></span>
+      <span class="legend"><span class="r">右手</span><span class="l">左手</span></span>
+      <span class="msg" id="stMsg"></span>
+    </div>
+    <div class="mic-banner" id="micBanner" hidden>
+      <span><b>本物のピアノで練習するには、マイクをオンにしてください。</b>iPadのマイクが音を聴き取って判定します（和音は1音合えば進みます）。</span>
+      <button type="button" class="btn accent" id="micBannerBtn">マイクをオン</button>
+      <button type="button" class="x" id="micBannerClose" aria-label="案内を閉じる">✕</button>
+    </div>
+    <div class="score-scroll" id="scoreScroll"><svg id="scoreSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="楽譜"></svg></div>
+    <div class="kb-wrap" id="kbWrap"><div class="kb" id="kb"></div></div>
+  </section>
+</div>
+
+<!-- 設定 -->
+<div class="sheet" id="settingsSheet" hidden>
+  <div class="sheet-card" role="dialog" aria-label="設定">
+    <h2>設定</h2>
+    <div>
+      <h3>入力</h3>
+      <div class="field"><span>電子ピアノ</span><span id="midiState" class="muted"></span><button type="button" class="btn" id="midiBtn">接続する</button></div>
+      <p class="hint-text" id="midiHint"></p>
+      <div class="field"><span>マイク</span><button type="button" class="btn" id="micBtn" aria-pressed="false">マイクで聴き取る</button></div>
+      <div class="field"><span>マイクの感度</span>
+        <div class="seg" id="sensSeg"><button type="button" data-sens="low">ひくい</button><button type="button" data-sens="mid">ふつう</button><button type="button" data-sens="high">たかい</button></div>
+      </div>
+      <div class="field"><span>マイクの遅れ補正</span><input type="range" id="latency" min="0" max="300" step="10"> <output id="latencyOut"></output></div>
+    </div>
+    <div>
+      <h3>楽譜の表示</h3>
+      <div class="field"><span>音名</span>
+        <div class="seg" id="namesSeg"><button type="button" data-names="none">なし</button><button type="button" data-names="ja">ドレミ</button><button type="button" data-names="en">CDE</button></div>
+      </div>
+      <div class="field"><span>音符の色分け</span><button type="button" class="btn" id="colorBtn" aria-pressed="false">ドレミで色分け</button></div>
+      <div class="field"><span>指番号</span><button type="button" class="btn" id="fingerBtn" aria-pressed="true">表示する</button></div>
+      <div class="field"><span>鍵盤の音名</span>
+        <div class="seg" id="keyLabelSeg"><button type="button" data-kl="none">なし</button><button type="button" data-kl="c">ドだけ</button><button type="button" data-kl="ja">ドレミ</button><button type="button" data-kl="en">CDE</button></div>
+      </div>
+    </div>
+    <div class="result-actions"><button type="button" class="btn primary" id="settingsClose">閉じる</button></div>
+  </div>
+</div>
+
+<!-- 結果 -->
+<div class="sheet" id="resultSheet" hidden>
+  <div class="sheet-card result-card" role="dialog" aria-label="結果">
+    <h2 id="resultTitle"></h2>
+    <div class="stars" id="resultStars"></div>
+    <div class="big-pct" id="resultPct"></div>
+    <div class="result-stats" id="resultStats"></div>
+    <p class="hint-text" id="resultNote"></p>
+    <div class="result-actions">
+      <button type="button" class="btn" id="resultClose">閉じる</button>
+      <button type="button" class="btn primary" id="resultAgain">もう一度</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<!--SCRIPTS-->
+<script>
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol) && !/claude\.ai|claudeusercontent/.test(location.hostname)) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
+</body>
+</html>

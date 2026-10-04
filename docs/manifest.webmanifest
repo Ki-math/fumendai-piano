@@ -1,0 +1,17 @@
+{
+  "name": "譜面台ピアノ",
+  "short_name": "譜面台ピアノ",
+  "description": "iPadを譜面台に置いて、本物のピアノで両手の練習をするアプリ",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ECEEF2",
+  "theme_color": "#1B1E28",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
